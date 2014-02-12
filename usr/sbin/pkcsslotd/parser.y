@@ -295,6 +295,7 @@
 #include "slotmgr.h"
 #include "pkcsslotd.h"
 
+extern Slot_Mgr_Socket_t socketData;
 Slot_Info_t_64 sinfo_struct;
 unsigned long int Index;
 int slot_count = 0;
@@ -344,7 +345,8 @@ void set_defaults(void);
 	unsigned int num;
 }
 
-%token EQUAL SLOT EOL OCKVERSION BEGIN_DEF END_DEF
+%start config_file
+%token EQUAL SLOT EOL OCKVERSION LOGLEVEL LOGFILE BEGIN_DEF END_DEF
 %token <str> STRING
 %token <str> KEYWORD
 %token <num> INTEGER
@@ -361,6 +363,14 @@ sections:
 	OCKVERSION STRING EOL
 	{
 		free($2);
+	}
+	| LOGFILE STRING EOL
+	{
+		strncpy(socketData.log_handle.logfile, $2, sizeof(socketData.log_handle.logfile));
+	}
+	| LOGLEVEL INTEGER EOL
+	{
+		socketData.log_handle.loglevel = $2;
 	}
 	| SLOT INTEGER BEGIN_DEF EOL
 	{

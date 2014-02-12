@@ -323,6 +323,8 @@ int line_num = 1;
 
 version                 return OCKVERSION;
 slot                    return SLOT;
+logfile                 return LOGFILE;
+loglevel                return LOGLEVEL;
 
 [^\"= \t\n]+		{
 			  yylval.str = strdup(yytext);
