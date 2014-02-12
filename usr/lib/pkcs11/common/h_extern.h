@@ -310,6 +310,7 @@
 
 #include <stdio.h>
 #include "msg.h"
+#include "log.h"
 
 #if (LEEDS_BUILD)
 #pragma options align=packed
@@ -2515,24 +2516,10 @@ extern token_spec_t token_specific;
 #pragma options align=full
 #endif
 
-/* logging */
-void ock_err_log(int num, const char *layer, const char *file, int line);
-void ock_logit(const char *fmt, ...);
-
-#ifdef DEBUG
 #define OCK_LOG_ERR(errnum)  ock_err_log(errnum, STDLL_NAME, __FILE__, __LINE__)
 #define OCK_LOG_DEBUG(fmt, ...)           ock_logit("%s:%d " fmt, __FILE__, __LINE__, ##__VA_ARGS__)
 void dump_shm(const char *);
 #define DUMP_SHM(x)             dump_shm(x)
-
-#else
-
-#define OCK_LOG_ERR(errnum)
-#define OCK_LOG_DEBUG(fmt, ...)
-#define DUMP_SHM(x)
-
-#endif
-
 #define OCK_SYSLOG(priority, fmt, ...) \
         syslog(priority, "%s " fmt, __FILE__, ##__VA_ARGS__);
 
