@@ -2060,6 +2060,16 @@ CK_RV C_GetFunctionList(CK_FUNCTION_LIST_PTR_PTR ppFunctionList)
 {
 
 	api_init();
+	Slot_Mgr_Socket_t socket_data;
+
+	if (!read_socket_data(&socket_data)) {
+		OCK_SYSLOG(LOG_ERR, "%s: Could not read pkcsslotd socket data. Verify if pkcsslotd is running.", __FUNCTION__);
+		return CKR_FUNCTION_FAILED;
+	}
+
+	if (!is_log_initialized()) {
+		init_log(&(socket_data.log_handle), OCK_INIT_ENV);
+	}
 
 	OCK_LOG_DEBUG("C_GetFunctionList\n");
 	FuncList.version.major = VERSION_MAJOR;
@@ -2824,6 +2834,16 @@ CK_RV C_Initialize(CK_VOID_PTR pVoid)
 {
 	CK_C_INITIALIZE_ARGS *pArg;
 	char fcnmap = 0;
+	Slot_Mgr_Socket_t socket_data;
+
+	if (!read_socket_data(&socket_data)) {
+		OCK_SYSLOG(LOG_ERR, "%s: Module failed to create a socket. Verify that the slot management daemon is running.", __FUNCTION__);
+		return CKR_FUNCTION_FAILED;
+	}
+
+	if (!is_log_initialized()) {
+		init_log(&(socket_data.log_handle), OCK_INIT_ENV);
+	}
 
 	OCK_LOG_DEBUG("C_Initialize\n");
 	//if ( API_Proc_Struct NOT allocated )
@@ -2980,14 +3000,8 @@ CK_RV C_Initialize(CK_VOID_PTR pVoid)
 	}
 	OCK_LOG_DEBUG("Shared memory %x \n", Anchor->SharedMemP);
 
-	if (!init_socket_data()) {
-		OCK_SYSLOG(LOG_ERR, "C_Initialize: Module failed to create a socket. Verify that the slot management daemon is running.");
-		OCK_LOG_ERR(ERR_SOCKET);
-		detach_shared_memory(Anchor->SharedMemP);
-		free((void *)Anchor); Anchor=NULL;
-		pthread_mutex_unlock(&GlobMutex);
-		return CKR_FUNCTION_FAILED;
-	}
+	/* Initialize global socket data */
+	memcpy(&(Anchor->SocketDataP), &socket_data, sizeof(Slot_Mgr_Socket_t));
 
 	// Initialize structure values
 
@@ -3015,7 +3029,8 @@ CK_RV C_Initialize(CK_VOID_PTR pVoid)
 			sltp = &(Anchor->SltList[slotID]);
 			confname = shData->slot_info[slotID].confname;
 			slot_loaded[slotID] = DL_Load_and_Init(sltp, slotID,
-							       confname);
+							       confname,
+							       &(Anchor->SocketDataP.log_handle));
 		}
 
 	}

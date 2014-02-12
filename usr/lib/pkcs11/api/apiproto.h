@@ -306,6 +306,7 @@
 
 #include "apictl.h"
 #include "msg.h"
+#include "log.h"
 
 void *attach_shared_memory();
 void  detach_shared_memory(char *);
@@ -315,8 +316,7 @@ int API_Initialized();
 void Terminate_All_Process_Sessions();
 int API_Register();
 void API_UnRegister();
-int DL_Load_and_Init(API_Slot_t *, CK_SLOT_ID, const char *);
-
+int DL_Load_and_Init(API_Slot_t *, CK_SLOT_ID, const char *, log_handle_t *hlog);
 
 CK_RV CreateXProcLock(void);
 CK_RV XProcLock(void);

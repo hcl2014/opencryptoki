@@ -312,6 +312,7 @@
 #include <sys/types.h>
 #include <grp.h>
 #include <pwd.h>
+#include <syslog.h>
 
 #include "pkcs11types.h"
 #include "stdll.h"
@@ -561,10 +562,16 @@ CK_RV
 ST_Initialize(void **FunctionList,
 	      CK_SLOT_ID SlotNumber,
 	      char *Correlator,
-	      char *conf_name)
+	      char *conf_name,
+	      log_handle_t *hlog)
 {
 	int    i;
 	CK_RV  rc = CKR_OK;
+
+	if (!is_log_initialized()) {
+		if (!init_log(hlog, OCK_INIT_NONE))
+			OCK_SYSLOG(LOG_ERR, "Failed to initialize the log.");
+	}
 
 	if ((rc = check_user_and_group()) != CKR_OK)
 		return rc;

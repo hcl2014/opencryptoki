@@ -307,8 +307,17 @@
 #include "host_defs.h" 
 #include "h_extern.h"
 #include "msg.h"
+#include "slotmgr.h"
+#include "log.h"
 
+#define DEFAULT_LOG_LEVEL OCK_LEVEL_ERROR
+
+/*
+ * Global variables
+ */
 pthread_mutex_t  lmtx = PTHREAD_MUTEX_INITIALIZER;
+
+static log_handle_t *g_hlog = NULL;
 
 static const char *ock_err_msg[] = {
 "Malloc Failed",			/*ERR_HOST_MEMORY*/
@@ -539,67 +548,141 @@ static const char *ock_err_msg[] = {
 
 void
 ock_err_log(int num, const char *layer, const char *file, int line)
-{ 
+{
 	if ( num < 0 || num > ERR_MAX)
-		num = ERR_MAX; 
-	
-	OCK_LOG_DEBUG("ERROR %s %s:%d %s\n", layer, file, line, ock_err_msg[num]);
+		num = ERR_MAX;
+
+	OCK_LOG_DEBUG("ERROR %s %s:%d %s\n", layer, file,
+			line, ock_err_msg[num]);
 }
 
-void 
-ock_logit(const char *fmt, ...)
+
+void ock_logit(const char *fmt, ...)
 {
 	va_list 	ap;
 	int 		fd;
-	char 		*logfile = NULL;
 	mode_t		mode;
-	
-	logfile = getenv("OPENCRYPTOKI_DEBUG_FILE");
-	if (logfile != NULL) {
-		
-		time_t t;
-		struct tm *tm;
-		char buf[1024];
-		char *pbuf;
-		int buflen, len;
 
-		pbuf = buf;
-		buflen = sizeof(buf);
+	if (is_log_initialized()) {
 
-		/* add pid */
-		len = snprintf(pbuf, buflen, "[%d]: ", getpid());
-		pbuf +=len;
-		buflen -= len;
+		if (strcmp(g_hlog->logfile, "")) {
+
+			time_t t;
+			struct tm *tm;
+			char buf[1024];
+			char *pbuf;
+			int buflen, len;
+
+			pbuf = buf;
+			buflen = sizeof(buf);
+
+			/* add pid */
+			len = snprintf(pbuf, buflen, "[%d]: ", getpid());
+			pbuf +=len;
+			buflen -= len;
 
 
-		/* add the current time */
-		t = time(0);
-		tm = localtime(&t);
-		len = strftime(pbuf, buflen, "%m/%d/%Y %H:%M:%S ", tm);
-		pbuf +=len;
-		buflen -= len;
+			/* add the current time */
+			t = time(0);
+			tm = localtime(&t);
+			len = strftime(pbuf, buflen, "%m/%d/%Y %H:%M:%S ", tm);
+			pbuf +=len;
+			buflen -= len;
 
-		/* add the format */
-		va_start(ap, fmt);
-		vsnprintf(pbuf, buflen, fmt, ap);
-		va_end(ap);
+			/* add the format */
+			va_start(ap, fmt);
+			vsnprintf(pbuf, buflen, fmt, ap);
+			va_end(ap);
 
-		/* set the mode */
-		mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+			/* set the mode */
+			mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
-		/* ok, open the file and append the message */
-		fd = open(logfile, O_RDWR|O_APPEND|O_CREAT, mode); 
-		if (fd >= 0) {
-			if (!(flock(fd, LOCK_EX))) {
+			/* ok, open the file and append the message */
+			fd = open(g_hlog->logfile, O_RDWR|O_APPEND|O_CREAT, mode); 
+			if (fd >= 0) {
+				if (!(flock(fd, LOCK_EX))) {
 
-				/* serialize appends to the debug file */
-				pthread_mutex_lock(&lmtx);
-				write(fd, buf, strlen(buf));
-				pthread_mutex_unlock(&lmtx);
-				flock(fd, LOCK_UN);
+					/* serialize appends to the debug file */
+					pthread_mutex_lock(&lmtx);
+					write(fd, buf, strlen(buf));
+					pthread_mutex_unlock(&lmtx);
+					flock(fd, LOCK_UN);
+				}
+				close(fd);
 			}
-			close(fd);
-		}	
 
+		}
 	}
+	else {
+		printf("%s: log is not initialized.\n", __FUNCTION__);
+	}
+}
+
+/*
+ * Initialize global log handle
+ */
+int init_log(log_handle_t *hlog, log_init_t flag) {
+
+	char *tmp;
+
+	if (hlog == NULL) {
+		printf("%s: Log handle is null. Log not initialized.\n",
+				__FUNCTION__);
+		return 0;
+	}
+
+	if (!is_log_initialized()) {
+
+		g_hlog = (log_handle_t *) malloc(sizeof(log_handle_t));
+		if (g_hlog == NULL) {
+			printf("%s: could not allocate memory for log handle.\n",
+					__FUNCTION__);
+			return 0;
+		}
+
+		switch (flag) {
+
+		case OCK_INIT_ENV:
+
+			tmp = getenv("OPENCRYPTOKI_DEBUG_FILE");
+			if (tmp) {
+				strncpy(g_hlog->logfile, tmp,
+						sizeof(g_hlog->logfile));
+			} else {
+				strncpy(g_hlog->logfile, hlog->logfile,
+						sizeof(g_hlog->logfile));
+			}
+
+			tmp = getenv("OPENCRYPTOKI_LOG_LEVEL");
+			if (tmp) {
+				g_hlog->loglevel = atoi(tmp);
+			} else {
+				g_hlog->loglevel = hlog->loglevel;
+			}
+
+			/* set default if log level is not valid */
+			if (g_hlog->loglevel < OCK_LEVEL_ERROR ||
+					g_hlog->loglevel > OCK_LEVEL_DEBUG) {
+				g_hlog->loglevel = DEFAULT_LOG_LEVEL;
+			}
+			break;
+
+		case OCK_INIT_NONE:
+			break;
+
+		default:
+			printf("%s: log_init_t flag not recognized.\n", __FUNCTION__);
+		}
+	}
+
+	return 1;
+}
+
+/*
+ * Check if log is enabled/initialized
+ */
+int is_log_initialized() {
+	if (g_hlog == NULL)
+		return 0;
+	return 1;
 }
