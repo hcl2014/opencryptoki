@@ -296,16 +296,24 @@
 #include <grp.h>
 #include <errno.h>
 
+/* 
+ * FIXME: get logging functions away from apiproto.h. A log.h should be created
+ * in order to decrease coupling and increase cohesion.
+ */
 #include "apiproto.h"
 #include "slotmgr.h"
-#include "apictl.h"
 
-extern  API_Proc_Struct_t  *Anchor;
-//
-// Will fill out the Slot_Mgr_Socket_t structure in the Anchor global data
-// structure with the values passed by the pkcsslotd via a socket RPC.
-int
-init_socket_data() {
+
+/*
+ * Read the data passed by pkcssslotd via socket RPC
+ * 
+ * @param socket_data : overwritten with the data received via socket
+ * @return TRUE
+ * @return FALSE
+ *
+ */
+int read_socket_data(Slot_Mgr_Socket_t *socket_data)
+{
 	int socketfd;
 	struct sockaddr_un daemon_address;
 	struct stat file_info;
@@ -314,24 +322,34 @@ init_socket_data() {
 	socklen_t address_length;
 	Slot_Mgr_Socket_t daemon_socket_data;
 
+	if (socket_data == NULL) {
+		OCK_SYSLOG(LOG_ERR, "%s: socket_data variable not defined",
+				__FUNCTION__);
+		return FALSE;
+	}
+
 	if (stat(SOCKET_FILE_PATH, &file_info)) {
-		OCK_SYSLOG(LOG_ERR, "init_socket_data: failed to find socket file, errno=%d", errno);
+		OCK_SYSLOG(LOG_ERR, "%s: failed to find socket file, errno=%d",
+				__FUNCTION__, errno);
 		return FALSE;
 	}
 
 	grp = getgrnam("pkcs11");
 	if ( !grp ) {
-		OCK_SYSLOG(LOG_ERR, "init_socket_data: pkcs11 group does not exist, errno=%d", errno);
+		OCK_SYSLOG(LOG_ERR, "%s: pkcs11 group does not exist, errno=%d",
+				__FUNCTION__, errno);
 		return FALSE;
 	}
 
 	if (file_info.st_uid != 0 || file_info.st_gid != grp->gr_gid) {
-		OCK_SYSLOG(LOG_ERR, "init_socket_data: incorrect permissions on socket file");
+		OCK_SYSLOG(LOG_ERR, "%s: incorrect permissions on socket file",
+				__FUNCTION__);
 		return FALSE;
 	}
 
 	if ((socketfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-		OCK_SYSLOG(LOG_ERR, "init_socket_data: failed to create socket, errno=%d", errno);
+		OCK_SYSLOG(LOG_ERR, "%s: failed to create socket, errno=%d",
+				__FUNCTION__, errno);
 		return FALSE;
 	}
 
@@ -341,21 +359,23 @@ init_socket_data() {
 
 	if (connect(socketfd, (struct sockaddr *) &daemon_address,
 	    sizeof(struct sockaddr_un)) != 0) {
-		OCK_SYSLOG(LOG_ERR, "init_socket_data: failed to connect to slot manager daemon, errno=%d", errno);
+		OCK_SYSLOG(LOG_ERR, "%s: failed to connect to slot manager daemon, errno=%d",
+				__FUNCTION__, errno);
 		return FALSE;
 	}
 
 	bytes_received = read(socketfd, &daemon_socket_data,
-			      sizeof(daemon_socket_data));
+			sizeof(daemon_socket_data));
+
 	if (bytes_received != sizeof(daemon_socket_data)) {
-		OCK_SYSLOG(LOG_ERR, "init_socket_data: did not recieve expected number of bytes from slot manager daemon. Expected %d bytes, got %d bytes.",
-			   sizeof(daemon_socket_data), bytes_received);
+		OCK_SYSLOG(LOG_ERR, "%s: did not recieve expected number of bytes from slot manager daemon. Expected %d bytes, got %d bytes.",
+				__FUNCTION__, sizeof(daemon_socket_data),
+				bytes_received);
 	}
 
 	close(socketfd);
 
-	memcpy(&(Anchor->SocketDataP), &daemon_socket_data,
-		sizeof(Slot_Mgr_Socket_t));
+	memcpy(socket_data, &daemon_socket_data, sizeof(daemon_socket_data));
 
 	return TRUE;
 }
