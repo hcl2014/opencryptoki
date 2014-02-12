@@ -7,11 +7,11 @@ pkcsslotd_LDFLAGS = -lpthread
 
 # Not all versions of automake observe sbinname_CFLAGS
 pkcsslotd_CFLAGS =  -DPROGRAM_NAME=\"$(@)\" \
-		   -I../. -I../../include/pkcs11 -I../../include/pkcs11/stdll
+		   -I../. -I../../include/pkcs11 -I../../include/pkcs11/stdll -I../../lib/pkcs11/common
 
 # Not all versions of automake observe sbinname_CFLAGS
 AM_CFLAGS = -DPROGRAM_NAME=\"$(@)\" \
-	    -I../. -I../../include/pkcs11 -I../../include/pkcs11/stdll
+	    -I../. -I../../include/pkcs11 -I../../include/pkcs11/stdll -I../../lib/pkcs11/common
 
 pkcsslotd_SOURCES = slotmgr.c shmem.c signal.c mutex.c err.c log.c daemon.c \
 		    garbage_linux.c pkcsslotd_util.c socket_server.c \
